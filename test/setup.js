@@ -1,4 +1,17 @@
 var nock = require('nock');
+
+[
+  'http_proxy',
+  'HTTP_PROXY',
+  'https_proxy',
+  'HTTPS_PROXY',
+  'all_proxy',
+  'ALL_PROXY',
+  'no_proxy',
+  'NO_PROXY',
+].forEach(function(name) {
+  delete process.env[name];
+});
 if (parseInt(process.versions.node, 10) >= 8) {
   // See DEP0066 at https://nodejs.org/api/deprecations.html.
   // _headers and _headerNames have been removed from Node v8, which causes
@@ -28,7 +41,7 @@ function echoheaders(origin) {
   nock(origin)
     .persist()
     .get('/echoheaders')
-    .reply(function() {
+    .reply(200, function() {
       var headers = this.req.headers;
       var excluded_headers = [
         'accept-encoding',

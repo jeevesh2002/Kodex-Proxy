@@ -1,4 +1,3 @@
-/* eslint-env mocha */
 require('./setup');
 
 var createServer = require('../').createServer;
@@ -175,7 +174,7 @@ describe('Basic functionality', function() {
       .post('/example.com/echopost')
       .attach('file', path.join(__dirname, 'dummy.txt'))
       .expect('Access-Control-Allow-Origin', '*')
-      .expect(/\r\nContent-Disposition: form-data; name="file"; filename="dummy.txt"\r\nContent-Type: text\/plain\r\n\r\ndummy content\n\r\n/, done); // eslint-disable-line max-len
+      .expect(/\r\nContent-Disposition: form-data; name="file"; filename="dummy.txt"\r\nContent-Type: text\/plain\r\n\r\ndummy content\r?\n\r\n/, done); // eslint-disable-line max-len
   });
 
   it('HEAD with redirect should be followed', function(done) {
@@ -450,6 +449,9 @@ describe('Proxy errors', function() {
     }
 
     var errorMessage = 'RangeError [ERR_HTTP_INVALID_STATUS_CODE]: Invalid status code: 0';
+    if (parseInt(process.versions.node, 10) >= 20) {
+      errorMessage = 'Error: Parse Error: Invalid status code';
+    }
     if (parseInt(process.versions.node, 10) < 9) {
       errorMessage = 'RangeError: Invalid status code: 0';
     }
@@ -460,12 +462,11 @@ describe('Proxy errors', function() {
   });
 
   it('Content-Encoding invalid body', function(done) {
-    // The HTTP status can't be changed because the headers have already been
-    // sent.
+    // Modern Node rejects the malformed chunk before forwarding the headers.
     request(cors_anywhere)
       .get('/' + bad_tcp_server_url)
       .expect('Access-Control-Allow-Origin', '*')
-      .expect(418, '', done);
+      .expect(404, /^Not found because of proxy error: Error: Parse Error:/, done);
   });
 
   it('Invalid header values', function(done) {
@@ -560,11 +561,7 @@ describe('NODE_TLS_REJECT_UNAUTHORIZED', function() {
   var bad_https_server;
   var bad_https_server_port;
 
-  var certErrorMessage = 'Error: certificate has expired';
-  // <0.11.11: https://github.com/nodejs/node/commit/262a752c2943842df7babdf55a034beca68794cd
-  if (/^0\.(?!11\.1[1-4]|12\.)/.test(process.versions.node)) {
-    certErrorMessage = 'Error: CERT_HAS_EXPIRED';
-  }
+  var certErrorMessage = /^Not found because of proxy error: Error: self-signed certificate(?:;.*)?$/;
 
   before(function() {
     cors_anywhere = createServer({});
@@ -580,7 +577,7 @@ describe('NODE_TLS_REJECT_UNAUTHORIZED', function() {
       key: fs.readFileSync(path.join(__dirname, 'key.pem')),
       cert: fs.readFileSync(path.join(__dirname, 'cert.pem')),
     }, function(req, res) {
-      res.end('Response from server with expired cert');
+      res.end('Response from server with self-signed cert');
     });
     bad_https_server_port = bad_https_server.listen(0).address().port;
 
@@ -603,7 +600,7 @@ describe('NODE_TLS_REJECT_UNAUTHORIZED', function() {
       .get('/https://127.0.0.1:' + bad_https_server_port)
       .set('test-include-xfwd', '')
       .expect('Access-Control-Allow-Origin', '*')
-      .expect('Not found because of proxy error: ' + certErrorMessage, done);
+      .expect(certErrorMessage, done);
   });
 
   it('ignore certificate errors via NODE_TLS_REJECT_UNAUTHORIZED=0', function(done) {
@@ -615,7 +612,7 @@ describe('NODE_TLS_REJECT_UNAUTHORIZED', function() {
         .get('/https://127.0.0.1:' + bad_https_server_port)
         .set('test-include-xfwd', '')
         .expect('Access-Control-Allow-Origin', '*')
-        .expect('Response from server with expired cert', done);
+        .expect('Response from server with self-signed cert', done);
     });
   });
 
@@ -631,7 +628,7 @@ describe('NODE_TLS_REJECT_UNAUTHORIZED', function() {
         .get('/https://127.0.0.1:' + bad_https_server_port)
         .set('test-include-xfwd', '')
         .expect('Access-Control-Allow-Origin', '*')
-        .expect('Not found because of proxy error: ' + certErrorMessage, done);
+        .expect(certErrorMessage, done);
     });
   });
 });
