@@ -1,0 +1,3 @@
+lib/*.js whitespace=cr-at-eol
+test/*.js whitespace=cr-at-eol
+package.json whitespace=cr-at-eol
