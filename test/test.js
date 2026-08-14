@@ -7,6 +7,16 @@ var http = require('http');
 var https = require('https');
 var fs = require('fs');
 var assert = require('assert');
+var selfsigned = require('selfsigned');
+
+var tlsOptions;
+before(async function() {
+  var pems = await selfsigned.generate(
+    [{name: 'commonName', value: 'localhost'}],
+    {algorithm: 'sha256'},
+  );
+  tlsOptions = {key: pems.private, cert: pems.cert};
+});
 
 var helpTextPath = path.join(__dirname, '../lib/help.txt');
 var helpText = fs.readFileSync(helpTextPath, {encoding: 'utf8'});
@@ -500,10 +510,7 @@ describe('server on https', function() {
   var NODE_TLS_REJECT_UNAUTHORIZED;
   before(function() {
     cors_anywhere = createServer({
-      httpsOptions: {
-        key: fs.readFileSync(path.join(__dirname, 'key.pem')),
-        cert: fs.readFileSync(path.join(__dirname, 'cert.pem')),
-      },
+      httpsOptions: tlsOptions,
     });
     cors_anywhere_port = cors_anywhere.listen(0).address().port;
     // Disable certificate validation in case the certificate expires.
@@ -572,11 +579,7 @@ describe('NODE_TLS_REJECT_UNAUTHORIZED', function() {
   });
 
   before(function() {
-    bad_https_server = https.createServer({
-      // rejectUnauthorized: false,
-      key: fs.readFileSync(path.join(__dirname, 'key.pem')),
-      cert: fs.readFileSync(path.join(__dirname, 'cert.pem')),
-    }, function(req, res) {
+    bad_https_server = https.createServer(tlsOptions, function(req, res) {
       res.end('Response from server with self-signed cert');
     });
     bad_https_server_port = bad_https_server.listen(0).address().port;
